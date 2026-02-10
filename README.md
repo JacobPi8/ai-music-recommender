@@ -35,12 +35,24 @@ cd ai-music-recommender
 
 It is recommended to use a virtual environment.
 
+#### Windows
+
 ```sh
-# Create virtual environment (Windows)
+# Create virtual environment
 python -m venv .venv
 
 # Activate environment
 .\.venv\Scripts\Activate
+```
+
+#### macOS / Linux
+
+```sh
+# Create virtual environment
+python3 -m venv .venv
+
+# Activate environment
+source .venv/bin/activate
 ```
 
 ### 3. Install Dependencies
