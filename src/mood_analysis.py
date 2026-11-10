@@ -127,6 +127,12 @@ def get_mood_label(
     return "Balanced / Neutral Vibe"
 
 
+def denormalize(value, value_range) -> float:
+    """Converts a 0-1 slider value back to real units (e.g. tempo in BPM, loudness in dB)."""
+    low, high = value_range
+    return low + value * (high - low)
+
+
 def format_key_mode(key, mode) -> str:
     """Converts numeric key and mode to string."""
     keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']

@@ -6,9 +6,9 @@ import streamlit as st
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 try:
-    from src.data_loader import DataLoader
+    from src.data_loader import DataLoader, find_dataset
     from src.recommender import Recommender
-    from src.mood_analysis import get_mood_label, format_key_mode
+    from src.mood_analysis import get_mood_label, format_key_mode, denormalize
     from src.styles import APP_STYLES
 except ImportError as e:
     st.error(f"Import Error: {e}. Make sure you are running the app from the root directory.")
@@ -41,15 +41,10 @@ def init_session_state():
 @st.cache_resource
 def initialize_system():
     """Loads data and initializes the Recommender engine."""
-    if os.path.exists("data/dataset.parquet"):
-        file_path = "data/dataset.parquet"
-    elif os.path.exists("data/dataset2.csv"):
-        file_path = "data/dataset2.csv"
-    else:
-        file_path = "data/dataset.csv"
+    file_path = find_dataset("data")
 
-    if not os.path.exists(file_path):
-        st.error(f"File not found: {file_path}")
+    if file_path is None:
+        st.error("Dataset not found. Download spotify_data.csv from Kaggle and put it in the data folder.")
         st.stop()
 
     loader = DataLoader(file_path)
@@ -57,7 +52,7 @@ def initialize_system():
     engine = Recommender(data)
     genres = loader.get_genres()
 
-    return engine, genres
+    return engine, genres, loader.feature_ranges
 
 
 def update_slider_values(row):
@@ -131,11 +126,15 @@ def render_sliders():
                  format_func=lambda x: "Minor" if x == 0 else "Major", horizontal=True)
 
 
-def render_action_area(engine, selected_genre):
+def render_action_area(engine, selected_genre, feature_ranges):
     """Renders mood display and the 'Find Tracks' button."""
+    # Mood analysis needs real units: loudness in dB, tempo in BPM
+    loudness_db = denormalize(st.session_state.val_loudness, feature_ranges['loudness'])
+    tempo_bpm = denormalize(st.session_state.val_tempo, feature_ranges['tempo'])
+
     live_mood = get_mood_label(
         st.session_state.val_valence, st.session_state.val_energy, st.session_state.val_dance,
-        st.session_state.val_acoustic, st.session_state.val_loudness, st.session_state.val_tempo,
+        st.session_state.val_acoustic, loudness_db, tempo_bpm,
         st.session_state.val_instrumental, st.session_state.val_speech
     )
 
@@ -229,7 +228,7 @@ def main():
     render_header()
 
     try:
-        engine, genres = initialize_system()
+        engine, genres, feature_ranges = initialize_system()
     except Exception as e:
         st.error(f"Initialization Error: {e}")
         return
@@ -253,7 +252,7 @@ def main():
     st.markdown("---")
 
     # Action Section
-    render_action_area(engine, selected_genre)
+    render_action_area(engine, selected_genre, feature_ranges)
 
     # Results Section
     render_results()

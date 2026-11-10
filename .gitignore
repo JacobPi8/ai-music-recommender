@@ -180,3 +180,6 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 /.idea
+
+# Datasets (download from Kaggle, see README)
+data/

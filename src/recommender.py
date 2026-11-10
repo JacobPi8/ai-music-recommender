@@ -27,7 +27,10 @@ class Recommender:
             self.data['artist_name'].astype(str) + " " + self.data['track_name'].astype(str)
         ).str.lower()
 
-    def search_song(self, query):
+        # Optimization: Create the feature tensor once (not on every search)
+        self.tensor_data = torch.tensor(self.data[self.feature_cols].values, dtype=torch.float32)
+
+    def search_song(self, query, limit=SEARCH_LIMIT):
         if not query:
             return pd.DataFrame()
 
@@ -37,22 +40,22 @@ class Recommender:
         mask = self.data['search_key'].str.contains(query, regex=False)
         results = self.data[mask]
 
-        return results.sort_values(by='popularity', ascending=False).head(SEARCH_LIMIT)
+        return results.sort_values(by='popularity', ascending=False).head(limit)
 
     def recommend(self, user_features, selected_genre=None, limit=REC_LIMIT):
         # Genre filtering
         if selected_genre and selected_genre != "All Genres":
-            target_data = self.data[self.data['genre'] == selected_genre]
+            mask = (self.data['genre'] == selected_genre).values
+            target_data = self.data[mask]
+            tensor_data = self.tensor_data[torch.from_numpy(mask)]
         else:
             target_data = self.data
+            tensor_data = self.tensor_data
 
         if target_data.empty:
             return pd.DataFrame()
 
         # Prepare tensors
-        data_array = target_data[self.feature_cols].values
-
-        tensor_data = torch.tensor(data_array, dtype=torch.float32)
         user_tensor = torch.tensor([user_features], dtype=torch.float32)
 
         # Calculate Cosine Similarity
@@ -68,3 +71,19 @@ class Recommender:
         candidates = candidates.sort_values(by='popularity', ascending=False)
 
         return candidates.head(limit)
+
+    def similar_to_track(self, track_id, limit=REC_LIMIT, same_genre=True):
+        """Recommends tracks with audio features similar to the given track."""
+        found = self.data[self.data['track_id'] == track_id]
+        if found.empty:
+            return pd.DataFrame()
+
+        track = found.iloc[0]
+        user_features = track[self.feature_cols].astype(float).tolist()
+        genre = track['genre'] if same_genre else None
+
+        # Ask for one more track, because the track itself is usually in the results
+        results = self.recommend(user_features, selected_genre=genre, limit=limit + 1)
+        results = results[results['track_id'] != track_id]
+
+        return results.head(limit)
