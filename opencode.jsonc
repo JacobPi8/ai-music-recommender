@@ -1,0 +1,13 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "servers": {
+      // Gives OpenCode access to the music recommender tools.
+      // Start opencode from this folder with the virtual environment activated.
+      "music-recommender": {
+        "type": "local",
+        "command": ["python", "mcp_server.py"]
+      }
+    }
+  }
+}

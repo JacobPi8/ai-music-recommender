@@ -2,6 +2,18 @@ import os
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 
+# Supported dataset files (first one found is used)
+DATASET_FILES = ["dataset.parquet", "spotify_data.csv"]
+
+
+def find_dataset(data_folder):
+    """Returns the path of the first dataset file found in the data folder."""
+    for file_name in DATASET_FILES:
+        file_path = os.path.join(data_folder, file_name)
+        if os.path.exists(file_path):
+            return file_path
+    return None
+
 
 class DataLoader:
     def __init__(self, file_path):
@@ -15,13 +27,25 @@ class DataLoader:
             'speechiness', 'mode'
         ]
 
-    def prepare_data(self) -> pd.DataFrame:
-        """Loads parquet file, normalizes data, and removes duplicates."""
+        # Real min/max of every feature (e.g. tempo in BPM, loudness in dB)
+        self.feature_ranges = {}
+
+    def load_file(self) -> pd.DataFrame:
+        """Loads parquet or csv file."""
         if not os.path.exists(self.file_path):
             raise FileNotFoundError(f"File not found: {self.file_path}")
 
-        # Load data
-        self.data = pd.read_parquet(self.file_path)
+        if self.file_path.endswith(".csv"):
+            return pd.read_csv(self.file_path, index_col=0)
+        return pd.read_parquet(self.file_path)
+
+    def prepare_data(self, data=None) -> pd.DataFrame:
+        """Loads data, normalizes it, and removes duplicates."""
+        # Load data (tests can pass a ready DataFrame)
+        if data is None:
+            self.data = self.load_file()
+        else:
+            self.data = data.copy()
 
         # Handle missing text values
         text_cols = ['artist_name', 'track_name']
@@ -36,6 +60,9 @@ class DataLoader:
 
         # Normalize audio features (0-1 range)
         self.data = self.data.dropna(subset=self.feature_columns)
+
+        for col in self.feature_columns:
+            self.feature_ranges[col] = (float(self.data[col].min()), float(self.data[col].max()))
 
         scaler = MinMaxScaler()
         norm_cols = [f"{col}_norm" for col in self.feature_columns]
